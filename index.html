@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lista zakupowa na rejs</title>
+
+  <!--
+  ============================================================
+  LISTA ZAKUPOWA NA REJS — 1 plik index.html + baza Supabase
+  ============================================================
+
+  1. Utwórz darmowy projekt na https://supabase.com
+  2. W Supabase wejdź w SQL Editor i uruchom:
+
+  create table public.shopping_items (
+    id uuid primary key default gen_random_uuid(),
+    name text not null,
+    checked boolean not null default false,
+    created_at timestamptz not null default now()
+  );
+
+  alter table public.shopping_items enable row level security;
+
+  create policy "Public read"
+  on public.shopping_items
+  for select
+  using (true);
+
+  create policy "Public insert"
+  on public.shopping_items
+  for insert
+  with check (true);
+
+  create policy "Public update"
+  on public.shopping_items
+  for update
+  using (true)
+  with check (true);
+
+  create policy "Public delete"
+  on public.shopping_items
+  for delete
+  using (true);
+
+  3. W Supabase wejdź w:
+     Project Settings -> API
+
+  4. Podmień niżej:
+     SUPABASE_URL
+     SUPABASE_ANON_KEY
+
+  5. Wrzuć ten plik jako index.html na hosting.
+
+  UWAGA:
+  Ten wariant jest publiczny. Każdy, kto zna link, może edytować listę.
+  -->
+
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #14213d;
+      --muted: #64748b;
+      --line: #dbe4ee;
+      --accent: #0f766e;
+      --accent-dark: #115e59;
+      --danger: #dc2626;
+      --done: #16a34a;
+      --shadow: 0 12px 34px rgba(15, 23, 42, .08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(14, 165, 233, .16), transparent 360px),
+        linear-gradient(180deg, #e9f7ff 0, var(--bg) 280px);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(620px, calc(100% - 28px));
+      margin: 32px auto;
+    }
+
+    header {
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 5vw, 42px);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, .94);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .config-warning {
+      display: none;
+      margin-bottom: 16px;
+      background: #fff7ed;
+      border-color: #fed7aa;
+      color: #7c2d12;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .item {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .item.checked {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+    }
+
+    .check {
+      width: 23px;
+      height: 23px;
+      accent-color: var(--done);
+      cursor: pointer;
+    }
+
+    .name {
+      font-weight: 750;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+
+    .checked .name {
+      text-decoration: line-through;
+      color: var(--muted);
+    }
+
+    .delete {
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 999px;
+      background: #fee2e2;
+      color: var(--danger);
+      font-size: 17px;
+      line-height: 1;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .delete:hover {
+      background: #fecaca;
+    }
+
+    .add-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      padding: 11px 12px;
+      font: inherit;
+      color: var(--text);
+      background: #fff;
+    }
+
+    input:focus {
+      outline: 3px solid rgba(15, 118, 110, .16);
+      border-color: var(--accent);
+    }
+
+    .add {
+      border: 0;
+      border-radius: 13px;
+      padding: 11px 14px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+      white-space: nowrap;
+    }
+
+    .add:hover {
+      background: var(--accent-dark);
+    }
+
+    .add:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .status {
+      min-height: 20px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 28px 10px;
+    }
+
+    @media (max-width: 520px) {
+      .wrap {
+        margin: 18px auto;
+      }
+
+      .add-row {
+        grid-template-columns: 1fr;
+      }
+
+      .add {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="wrap">
+    <header>
+      <h1>⛵ Lista zakupowa na rejs</h1>
+      <p class="lead">Wspólna lista zakupów dla załogi.</p>
+    </header>
+
+    <section id="configWarning" class="card config-warning">
+      <strong>Brakuje konfiguracji Supabase.</strong><br>
+      Podmień w pliku <code>SUPABASE_URL</code> oraz <code>SUPABASE_ANON_KEY</code>.
+    </section>
+
+    <section class="card">
+      <ul id="list" class="list">
+        <li class="empty">Ładowanie listy...</li>
+      </ul>
+
+      <form id="addForm" class="add-row">
+        <input id="name" type="text" placeholder="Wpisz nowy element..." required />
+        <button id="addBtn" class="add" type="submit">dodaj nowy</button>
+      </form>
+
+      <div id="status" class="status"></div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://zglxtpyclfptlqryjylo.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_LFn5z2Wd1oeUarfbnHRl6Q_u2-lmdlz';
+    const TABLE_NAME = 'shopping_items';
+
+    let supabaseClient = null;
+    let items = [];
+
+    const els = {
+      configWarning: document.getElementById('configWarning'),
+      list: document.getElementById('list'),
+      addForm: document.getElementById('addForm'),
+      name: document.getElementById('name'),
+      addBtn: document.getElementById('addBtn'),
+      status: document.getElementById('status')
+    };
+
+    function isConfigured() {
+      return SUPABASE_URL &&
+        SUPABASE_ANON_KEY &&
+        !SUPABASE_URL.includes('WKLEJ_TUTAJ') &&
+        !SUPABASE_ANON_KEY.includes('WKLEJ_TUTAJ');
+    }
+
+    function setStatus(message, isError = false) {
+      els.status.textContent = message || '';
+      els.status.style.color = isError ? '#dc2626' : '#64748b';
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function initSupabase() {
+      if (!isConfigured()) {
+        els.configWarning.style.display = 'block';
+        els.addBtn.disabled = true;
+        els.list.innerHTML = '<li class="empty">Brak konfiguracji bazy danych.</li>';
+        setStatus('Uzupełnij konfigurację Supabase w pliku index.html.', true);
+        return false;
+      }
+
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      return true;
+    }
+
+    async function loadItems() {
+      setStatus('Ładowanie...');
+
+      const { data, error } = await supabaseClient
+        .from(TABLE_NAME)
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error(error);
+        els.list.innerHTML = '<li class="empty">Nie udało się pobrać listy.</li>';
+        setStatus('Błąd ładowania: ' + error.message, true);
+        return;
+      }
+
+      items = data || [];
+      render();
+      setStatus('');
+    }
+
+    function render() {
+      if (!items.length) {
+        els.list.innerHTML = '<li class="empty">Lista jest pusta.</li>';
+        return;
+      }
+
+      els.list.innerHTML = items.map(item => `
+        <li class="item ${item.checked ? 'checked' : ''}">
+          <input
+            class="check"
+            type="checkbox"
+            ${item.checked ? 'checked' : ''}
+            onchange="toggleItem('${item.id}', this.checked)"
+            aria-label="Oznacz jako kupione"
+          />
+
+          <span class="name">${escapeHtml(item.name)}</span>
+
+          <button
+            class="delete"
+            type="button"
+            onclick="deleteItem('${item.id}')"
+            aria-label="Usuń"
+            title="Usuń"
+          >×</button>
+        </li>
+      `).join('');
+    }
+
+    async function addItem(event) {
+      event.preventDefault();
+
+      const name = els.name.value.trim();
+      if (!name) return;
+
+      els.addBtn.disabled = true;
+      setStatus('Dodawanie...');
+
+      const { error } = await supabaseClient
+        .from(TABLE_NAME)
+        .insert([{ name, checked: false }]);
+
+      els.addBtn.disabled = false;
+
+      if (error) {
+        console.error(error);
+        setStatus('Błąd dodawania: ' + error.message, true);
+        return;
+      }
+
+      els.name.value = '';
+      els.name.focus();
+      await loadItems();
+    }
+
+    async function toggleItem(id, checked) {
+      const { error } = await supabaseClient
+        .from(TABLE_NAME)
+        .update({ checked })
+        .eq('id', id);
+
+      if (error) {
+        console.error(error);
+        setStatus('Błąd zapisu: ' + error.message, true);
+        await loadItems();
+        return;
+      }
+
+      const item = items.find(item => item.id === id);
+      if (item) item.checked = checked;
+
+      render();
+    }
+
+    async function deleteItem(id) {
+      const { error } = await supabaseClient
+        .from(TABLE_NAME)
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error(error);
+        setStatus('Błąd usuwania: ' + error.message, true);
+        return;
+      }
+
+      items = items.filter(item => item.id !== id);
+      render();
+    }
+
+    function subscribeToChanges() {
+      supabaseClient
+        .channel('shopping_items_public_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: TABLE_NAME },
+          () => loadItems()
+        )
+        .subscribe();
+    }
+
+    els.addForm.addEventListener('submit', addItem);
+
+    window.toggleItem = toggleItem;
+    window.deleteItem = deleteItem;
+
+    if (initSupabase()) {
+      loadItems();
+      subscribeToChanges();
+    }
+  </script>
+</body>
+</html>
